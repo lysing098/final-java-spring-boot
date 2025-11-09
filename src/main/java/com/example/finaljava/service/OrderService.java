@@ -47,7 +47,7 @@ public class OrderService {
 
                 // Check stock
                 if (product.getStock() < detail.getQuantity()) {
-                    throw new RuntimeException("Not enough stock for product: " + product.getName());
+                    throw new RuntimeException("Not enough stock for product: " + product.getTitle());
                 }
 
                 // Deduct stock
@@ -105,7 +105,7 @@ public class OrderService {
                                 "Product not found with id " + detail.getProduct().getId()));
 
                 if (product.getStock() < detail.getQuantity()) {
-                    throw new RuntimeException("Not enough stock for product: " + product.getName());
+                    throw new RuntimeException("Not enough stock for product: " + product.getTitle());
                 }
 
                 product.setStock(product.getStock() - detail.getQuantity());

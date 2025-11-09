@@ -10,5 +10,5 @@ import java.net.ContentHandler;
 public interface ProductRepository extends JpaRepository<Product, Integer> {
     Product findProductById(int id);
 
-    Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    Page<Product> findByTitleContainingIgnoreCase(String name, Pageable pageable);
 }

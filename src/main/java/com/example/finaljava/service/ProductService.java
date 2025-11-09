@@ -1,19 +1,18 @@
 package com.example.finaljava.service;
 
-import com.example.finaljava.configuration.FileUploadUtil;
 import com.example.finaljava.exceptions.MyResourceNotFoundException;
 import com.example.finaljava.model.Product;
 import com.example.finaljava.repository.ProductRepository;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,104 +28,86 @@ public class ProductService {
     @Value("${server.port}")
     private String port;
 
-    @Autowired
-    private ProductRepository productRepository;
+    private final ProductRepository productRepository;
+
+    public ProductService(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
+
+    // Helper: get full URL for images
+    private String getImageUrl(String filename) {
+        if (filename == null || filename.isEmpty()) return "";
+        return "http://" + localhost + ":" + port + "/uploads/" + filename;
+    }
 
     public List<Product> getAllProducts() {
-        var products = productRepository.findAll();
-
-        for(Product product : products) {
-            if(product.getPhoto()==null || product.getPhoto().isEmpty()) {
-                product.setPhoto("");
-            }
-            else {
-                product.setPhoto(localhost+":"+port+"/uploads/"+product.getPhoto());
-            }
-        }
+        List<Product> products = productRepository.findAll();
+        products.forEach(p -> p.setImage(getImageUrl(p.getImage())));
         return products;
     }
 
     public Product getProductById(int id) {
-        var product = productRepository.findProductById(id);
-        if(product==null) {
-            throw new MyResourceNotFoundException("product not found with id "+id);
-        }
-
-        if(product.getPhoto()==null || product.getPhoto().isEmpty()) {
-            product.setPhoto("");
-        }
-        else {
-            product.setPhoto(localhost+":"+port+"/uploads/"+product.getPhoto());
-        }
-        return  product;
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new MyResourceNotFoundException("Product not found with id " + id));
+        product.setImage(getImageUrl(product.getImage()));
+        return product;
     }
 
-    @Async
     @Transactional
-    public void createProduct(@Valid Product product, MultipartFile file) throws Exception {
-        if(file!=null && !file.isEmpty()) {
-            String fileName = UUID.randomUUID()+ "_" + file.getOriginalFilename();
-            FileUploadUtil.saveFile(uploadDir, fileName, file);
-            product.setPhoto(fileName);
-        }
-        else{
-            product.setPhoto(null);
+    public void createProduct(@Valid Product product, MultipartFile file) throws IOException {
+        if (file != null && !file.isEmpty()) {
+            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+
+            Path filePath = uploadPath.resolve(fileName);
+            file.transferTo(filePath.toFile());
+            product.setImage(fileName);
         }
         productRepository.save(product);
     }
 
-    public void deleteProductById(int id) throws IOException {
-        var productExist = productRepository.findProductById(id);
-        if(productExist==null) {
-            throw new MyResourceNotFoundException("product not found with id "+id);
-        }
-        if(productExist.getPhoto()!=null &&  !productExist.getPhoto().isEmpty()) {
-            FileUploadUtil.removePhoto(uploadDir,productExist.getPhoto());
-        }
-
-        this.productRepository.deleteById(id);
-    }
-
-    public List<Product> findByName(String name, int page, int size) {
-        var pageable = PageRequest.of(page, size);
-        return productRepository.findByNameContainingIgnoreCase(name,pageable).getContent();
-
-    }
-
-    public List<Product> paginated(int page, int size) {
-        var pageable = PageRequest.of(page, size);
-        return productRepository.findAll(pageable).getContent();
-    }
-
-    @Async
     @Transactional
     public void updateProductById(int id, @Valid Product product, MultipartFile file) throws IOException {
-        var productExist = productRepository.findProductById(id);
-        if (productExist == null) {
-            throw new MyResourceNotFoundException("Product not found with id: " + id);
-        }
+        Product existing = productRepository.findById(id)
+                .orElseThrow(() -> new MyResourceNotFoundException("Product not found with id: " + id));
 
-        // ✅ Update basic info
-        productExist.setName(product.getName());
-        productExist.setDescription(product.getDescription());
-        productExist.setPrice(product.getPrice());
-        productExist.setBarcode(product.getBarcode());
-        productExist.setStock(product.getStock());
-        productExist.setCategory(product.getCategory());
+        // Update basic fields
+        existing.setTitle(product.getTitle());
+        existing.setDescription(product.getDescription());
+        existing.setPrice(product.getPrice());
+        existing.setDiscount(product.getDiscount());
+        existing.setBarcode(product.getBarcode());
+        existing.setStock(product.getStock());
+        existing.setCategory(product.getCategory());
 
-        // ✅ Handle file upload safely
+        // Handle image
         if (file != null && !file.isEmpty()) {
-            if (productExist.getPhoto() != null && !productExist.getPhoto().isEmpty()) {
-                FileUploadUtil.removePhoto(uploadDir, productExist.getPhoto());
+            if (existing.getImage() != null && !existing.getImage().isEmpty()) {
+                Path oldFile = Paths.get(uploadDir).resolve(existing.getImage());
+                Files.deleteIfExists(oldFile);
             }
-
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-            FileUploadUtil.saveFile(uploadDir, fileName, file);
-            productExist.setPhoto(fileName);
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+            Path filePath = uploadPath.resolve(fileName);
+            file.transferTo(filePath.toFile());
+            existing.setImage(fileName);
         }
 
-        // ✅ Save updated product
-        productRepository.save(productExist);
+        productRepository.save(existing);
     }
 
+    @Transactional
+    public void deleteProductById(int id) throws IOException {
+        Product existing = productRepository.findById(id)
+                .orElseThrow(() -> new MyResourceNotFoundException("Product not found with id " + id));
+
+        if (existing.getImage() != null && !existing.getImage().isEmpty()) {
+            Path filePath = Paths.get(uploadDir).resolve(existing.getImage());
+            Files.deleteIfExists(filePath);
+        }
+
+        productRepository.delete(existing);
+    }
 }

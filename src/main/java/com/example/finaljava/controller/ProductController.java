@@ -8,71 +8,90 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/product")
+@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
 public class ProductController {
 
     @Autowired
     private ProductService productService;
 
-    @GetMapping("")
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<?> createProduct(
+            @RequestParam String title,
+            @RequestParam String description,
+            @RequestParam Double price,
+            @RequestParam Double discount,
+            @RequestParam Integer barcode,
+            @RequestParam int stock,
+            @RequestParam String category,
+            @RequestParam(value = "image", required = false) MultipartFile image
+    ) throws IOException {
+        Product product = new Product();
+        product.setTitle(title);
+        product.setDescription(description);
+        product.setPrice(price);
+        product.setDiscount(discount);
+        product.setBarcode(barcode);
+        product.setStock(stock);
+        product.setCategory(category);
+
+        productService.createProduct(product, image);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Product created successfully");
+        response.put("data", productService.getProductById(product.getId()));
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+    public ResponseEntity<?> updateProduct(
+            @PathVariable int id,
+            @RequestParam String title,
+            @RequestParam String description,
+            @RequestParam Double price,
+            @RequestParam Double discount,
+            @RequestParam Integer barcode,
+            @RequestParam int stock,
+            @RequestParam String category,
+            @RequestParam(value = "image", required = false) MultipartFile image
+    ) throws IOException {
+        Product product = new Product();
+        product.setTitle(title);
+        product.setDescription(description);
+        product.setPrice(price);
+        product.setDiscount(discount);
+        product.setBarcode(barcode);
+        product.setStock(stock);
+        product.setCategory(category);
+
+        productService.updateProductById(id, product, image);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Product updated successfully");
+        response.put("data", productService.getProductById(id));
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
     public ResponseEntity<?> getAllProducts() {
-        var products = productService.getAllProducts();
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productService.getAllProducts());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getProductById(@PathVariable int id) {
-        var product = productService.getProductById(id);
-        return ResponseEntity.ok(product);
-    }
-
-    @PostMapping("")
-    public ResponseEntity<?> createProduct(@Valid Product product, @RequestParam(value = "file",required = false) MultipartFile file) throws Exception {
-        productService.createProduct(product,file);
-        Map<String,Object> response = new HashMap<>();
-        response.put("message","Product created");
-        response.put("data",product);
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateProductById(@PathVariable int id, @Valid Product product ,@RequestParam(value = "file",required = false) MultipartFile file) throws Exception  {
-        productService.updateProductById(id,product,file);
-
-        var updatedProduct = productService.getProductById(id);
-
-        Map<String,Object> response = new HashMap<>();
-        response.put("message","Product updated");
-        response.put("data",updatedProduct);
-        return ResponseEntity.ok(response);
-
+        return ResponseEntity.ok(productService.getProductById(id));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteProductById(@PathVariable int id,@RequestParam(value = "file",required = false) MultipartFile file) throws Exception {
+    public ResponseEntity<?> deleteProduct(@PathVariable int id) throws IOException {
         productService.deleteProductById(id);
-        Map<String,Object> response = new HashMap<>();
-        response.put("message","Product deleted");
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Product deleted successfully");
         return ResponseEntity.ok(response);
-
     }
-
-    @PostMapping("/searchByname")
-    public ResponseEntity<?> searchProductByName(@RequestParam String name,@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-        var product  =this.productService.findByName(name,page,size);
-        return ResponseEntity.ok(product);
-
-    }
-
-    @GetMapping("/paginated")
-    public ResponseEntity<?> paginated(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size){
-        var products = this.productService.paginated(page,size);
-        return ResponseEntity.ok(products);
-    }
-
 }

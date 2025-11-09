@@ -14,9 +14,68 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/customer")
+@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", allowCredentials = "true")
 public class CustomerController {
+
     @Autowired
     private CustomerService customerService;
+
+    // ------------------- CREATE -------------------
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<?> createCustomer(
+            @RequestParam String name,
+            @RequestParam String gender,
+            @RequestParam String email,
+            @RequestParam String password,
+            @RequestParam String tel,
+            @RequestParam String address,
+            @RequestParam(value = "file", required = false) MultipartFile file
+    ) throws Exception {
+
+        Customer customer = new Customer();
+        customer.setName(name);
+        customer.setGender(gender);
+        customer.setEmail(email);
+        customer.setPassword(password);
+        customer.setTel(tel);
+        customer.setAddress(address);
+
+        Customer savedCustomer = customerService.createCustomer(customer, file);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Customer Created");
+        response.put("customer", savedCustomer);
+        return ResponseEntity.ok(response);
+    }
+
+    // ------------------- UPDATE -------------------
+    @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+    public ResponseEntity<?> updateCustomer(
+            @PathVariable int id,
+            @RequestParam String name,
+            @RequestParam String gender,
+            @RequestParam String email,
+            @RequestParam String password,
+            @RequestParam String tel,
+            @RequestParam String address,
+            @RequestParam(value = "file", required = false) MultipartFile file
+    ) throws Exception {
+
+        Customer customer = new Customer();
+        customer.setName(name);
+        customer.setGender(gender);
+        customer.setEmail(email);
+        customer.setPassword(password);
+        customer.setTel(tel);
+        customer.setAddress(address);
+
+        Customer updatedCustomer = customerService.updateCustomer(id, customer, file);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Customer Updated");
+        response.put("customer", updatedCustomer);
+        return ResponseEntity.ok(response);
+    }
 
     // ------------------- GET ALL -------------------
     @GetMapping("")
@@ -32,54 +91,12 @@ public class CustomerController {
         return ResponseEntity.ok(customer);
     }
 
-    // ------------------- CREATE -------------------
-    @PostMapping("")
-    public ResponseEntity<?> createCustomer(@Valid Customer customer,
-                                            @RequestParam(value = "file", required = false) MultipartFile file) throws Exception {
-        customerService.createCustomer(customer, file);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Customer Created");
-        response.put("customer", customer);
-        return ResponseEntity.ok(response);
-    }
-
-    // ------------------- UPDATE -------------------
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateCustomer(@PathVariable int id,
-                                            @Valid Customer customer,
-                                            @RequestParam(value = "file", required = false) MultipartFile file) throws Exception {
-        customerService.updateCustomer(id, customer, file);
-        var updatedCustomer = customerService.findCustomerById(id);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Customer Updated");
-        response.put("customer", updatedCustomer);
-        return ResponseEntity.ok(response);
-    }
-
     // ------------------- DELETE -------------------
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCustomer(@PathVariable int id) throws Exception {
         customerService.deleteCustomer(id);
-
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Customer Deleted");
         return ResponseEntity.ok(response);
-    }
-
-    // ------------------- SEARCH BY NAME -------------------
-    @PostMapping("/searchByName")
-    public ResponseEntity<?> searchByName(@RequestParam String name,
-                                                       @RequestParam(defaultValue = "0") int page,
-                                                       @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(customerService.searchByName(name, page, size));
-    }
-
-    // ------------------- PAGINATED -------------------
-    @GetMapping("/paginated")
-    public ResponseEntity<?> paginated(@RequestParam(defaultValue = "0") int page,
-                                                    @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(customerService.paginated(page, size));
     }
 }

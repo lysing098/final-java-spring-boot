@@ -61,31 +61,26 @@ public class CustomerService {
         }
     }
 
-    // ------------------- GET ALL -------------------
+    // Helper to build full photo URL
+    private String buildPhotoUrl(String photoFileName) {
+        if(photoFileName == null || photoFileName.isEmpty()) return "";
+        return "http://" + localhost + ":" + port + "/uploads/" + photoFileName;
+    }
+
     public List<Customer> getAllCustomers() {
         var customers = customerRepository.findAll();
         for (Customer c : customers) {
-            if (c.getPhoto() == null || c.getPhoto().isEmpty()) {
-                c.setPhoto("");
-            } else {
-                c.setPhoto(localhost + ":" + port + "/uploads/" + c.getPhoto());
-            }
+            c.setPhoto(buildPhotoUrl(c.getPhoto()));
         }
         return customers;
     }
 
-    // ------------------- GET BY ID -------------------
     public Customer findCustomerById(int id) {
         var customer = customerRepository.findCustomerById(id);
         if (customer == null) {
             throw new MyResourceNotFoundException("Customer not found with id " + id);
         }
-
-        if (customer.getPhoto() == null || customer.getPhoto().isEmpty()) {
-            customer.setPhoto("");
-        } else {
-            customer.setPhoto(localhost + ":" + port + "/uploads/" + customer.getPhoto());
-        }
+        customer.setPhoto(buildPhotoUrl(customer.getPhoto()));
         return customer;
     }
 
@@ -98,13 +93,17 @@ public class CustomerService {
             throw new MyResourceNotFoundException("Customer not found with id " + id);
         }
 
-        // ✅ Update text fields
+        // Update text fields
         customerExists.setName(customer.getName());
         customerExists.setEmail(customer.getEmail());
         customerExists.setGender(customer.getGender());
-        customerExists.setPassword(customer.getPassword());
         customerExists.setTel(customer.getTel());
         customerExists.setAddress(customer.getAddress());
+
+        // Update password only if provided
+        if (customer.getPassword() != null && !customer.getPassword().isEmpty()) {
+            customerExists.setPassword(customer.getPassword());
+        }
 
         String newFileName = null;
         String oldPhoto = customerExists.getPhoto();
@@ -119,10 +118,16 @@ public class CustomerService {
 
             if (newFileName != null) {
                 FileUploadUtil.saveFile(uploadDir, newFileName, file);
-
                 if (oldPhoto != null && !oldPhoto.isEmpty()) {
                     FileUploadUtil.removePhoto(uploadDir, oldPhoto);
                 }
+            }
+
+            // Build full photo URL before returning
+            if (savedCustomer.getPhoto() != null && !savedCustomer.getPhoto().isEmpty()) {
+                savedCustomer.setPhoto("http://" + localhost + ":" + port + "/uploads/" + savedCustomer.getPhoto());
+            } else {
+                savedCustomer.setPhoto("");
             }
 
             return savedCustomer;
@@ -133,6 +138,7 @@ public class CustomerService {
             throw e;
         }
     }
+
 
     // ------------------- DELETE -------------------
     @Transactional
