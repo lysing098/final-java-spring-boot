@@ -82,11 +82,12 @@ public class UserService {
             if (user.getPhoto() == null || user.getPhoto().isEmpty()) {
                 user.setPhoto("");
             } else {
-                user.setPhoto(localhost + ":" + port + "/uploads/" + user.getPhoto());
+                user.setPhoto("http://" + localhost + ":" + port + "/uploads/" + user.getPhoto());
             }
         }
         return users;
     }
+
 
     // ------------------- GET BY ID -------------------
     public User findUserById(int id) {
@@ -98,10 +99,11 @@ public class UserService {
         if (user.getPhoto() == null || user.getPhoto().isEmpty()) {
             user.setPhoto("");
         } else {
-            user.setPhoto(localhost + ":" + port + "/uploads/" + user.getPhoto());
+            user.setPhoto("http://" + localhost + ":" + port + "/uploads/" + user.getPhoto());
         }
         return user;
     }
+
 
     // ------------------- UPDATE -------------------
     @Transactional
