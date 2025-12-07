@@ -32,16 +32,27 @@ public class CustomerService {
     @Autowired
     private CustomerRepository customerRepository;
 
+    // ------------------- HELPER -------------------
+    private String buildPhotoUrl(String photoFileName) {
+        if (photoFileName == null || photoFileName.isEmpty()) return "";
+        return "http://" + localhost + ":" + port + "/uploads/" + photoFileName;
+    }
+
+    private String getFileNameFromUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        // Remove full URL if somehow stored
+        return url.replaceFirst("^https?://.*/uploads/", "");
+    }
+
     // ------------------- CREATE -------------------
     @Async
     @Transactional
     public Customer createCustomer(@Valid Customer customer, MultipartFile file) throws Exception {
         String fileName = null;
-
         try {
             if (file != null && !file.isEmpty()) {
                 fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-                customer.setPhoto(fileName);
+                customer.setPhoto(fileName); // store only filename
             } else {
                 customer.setPhoto(null);
             }
@@ -52,7 +63,10 @@ public class CustomerService {
                 FileUploadUtil.saveFile(uploadDir, fileName, file);
             }
 
+            // Set full URL before returning to frontend
+            savedCustomer.setPhoto(buildPhotoUrl(savedCustomer.getPhoto()));
             return savedCustomer;
+
         } catch (Exception e) {
             if (fileName != null) {
                 FileUploadUtil.removePhoto(uploadDir, fileName);
@@ -61,16 +75,12 @@ public class CustomerService {
         }
     }
 
-    // Helper to build full photo URL
-    private String buildPhotoUrl(String photoFileName) {
-        if(photoFileName == null || photoFileName.isEmpty()) return "";
-        return "http://" + localhost + ":" + port + "/uploads/" + photoFileName;
-    }
-
+    // ------------------- READ -------------------
     public List<Customer> getAllCustomers() {
         var customers = customerRepository.findAll();
         for (Customer c : customers) {
-            c.setPhoto(buildPhotoUrl(c.getPhoto()));
+            // convert filename to full URL
+            c.setPhoto(buildPhotoUrl(getFileNameFromUrl(c.getPhoto())));
         }
         return customers;
     }
@@ -80,7 +90,7 @@ public class CustomerService {
         if (customer == null) {
             throw new MyResourceNotFoundException("Customer not found with id " + id);
         }
-        customer.setPhoto(buildPhotoUrl(customer.getPhoto()));
+        customer.setPhoto(buildPhotoUrl(getFileNameFromUrl(customer.getPhoto())));
         return customer;
     }
 
@@ -100,37 +110,32 @@ public class CustomerService {
         customerExists.setTel(customer.getTel());
         customerExists.setAddress(customer.getAddress());
 
-        // Update password only if provided
         if (customer.getPassword() != null && !customer.getPassword().isEmpty()) {
             customerExists.setPassword(customer.getPassword());
         }
 
         String newFileName = null;
-        String oldPhoto = customerExists.getPhoto();
+        String oldPhotoFileName = getFileNameFromUrl(customerExists.getPhoto());
 
         try {
             if (file != null && !file.isEmpty()) {
                 newFileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-                customerExists.setPhoto(newFileName);
+                customerExists.setPhoto(newFileName); // store only filename
             }
 
             Customer savedCustomer = customerRepository.save(customerExists);
 
             if (newFileName != null) {
                 FileUploadUtil.saveFile(uploadDir, newFileName, file);
-                if (oldPhoto != null && !oldPhoto.isEmpty()) {
-                    FileUploadUtil.removePhoto(uploadDir, oldPhoto);
+                if (oldPhotoFileName != null && !oldPhotoFileName.isEmpty()) {
+                    FileUploadUtil.removePhoto(uploadDir, oldPhotoFileName);
                 }
             }
 
-            // Build full photo URL before returning
-            if (savedCustomer.getPhoto() != null && !savedCustomer.getPhoto().isEmpty()) {
-                savedCustomer.setPhoto("http://" + localhost + ":" + port + "/uploads/" + savedCustomer.getPhoto());
-            } else {
-                savedCustomer.setPhoto("");
-            }
-
+            // Return full URL to frontend
+            savedCustomer.setPhoto(buildPhotoUrl(savedCustomer.getPhoto()));
             return savedCustomer;
+
         } catch (Exception e) {
             if (newFileName != null) {
                 FileUploadUtil.removePhoto(uploadDir, newFileName);
@@ -138,7 +143,6 @@ public class CustomerService {
             throw e;
         }
     }
-
 
     // ------------------- DELETE -------------------
     @Transactional
@@ -148,22 +152,31 @@ public class CustomerService {
             throw new MyResourceNotFoundException("Customer not found with id " + id);
         }
 
-        if (customerExists.getPhoto() != null && !customerExists.getPhoto().isEmpty()) {
-            FileUploadUtil.removePhoto(uploadDir, customerExists.getPhoto());
+        String photoFileName = getFileNameFromUrl(customerExists.getPhoto());
+        if (photoFileName != null && !photoFileName.isEmpty()) {
+            FileUploadUtil.removePhoto(uploadDir, photoFileName);
         }
 
-        this.customerRepository.deleteById(id);
+        customerRepository.deleteById(id);
     }
 
     // ------------------- PAGINATION -------------------
     public List<Customer> paginated(int page, int size) {
         var pageable = PageRequest.of(page, size);
-        return customerRepository.findAll(pageable).getContent();
+        var list = customerRepository.findAll(pageable).getContent();
+        for (Customer c : list) {
+            c.setPhoto(buildPhotoUrl(getFileNameFromUrl(c.getPhoto())));
+        }
+        return list;
     }
 
     // ------------------- SEARCH -------------------
     public List<Customer> searchByName(String name, int page, int size) {
         var pageable = PageRequest.of(page, size);
-        return customerRepository.findByNameContainingIgnoreCase(name, pageable).getContent();
+        var list = customerRepository.findByNameContainingIgnoreCase(name, pageable).getContent();
+        for (Customer c : list) {
+            c.setPhoto(buildPhotoUrl(getFileNameFromUrl(c.getPhoto())));
+        }
+        return list;
     }
 }
